@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from app.core.config import Settings
 from app.schemas.report import PublishReportRequest
 from app.services.errors import IntegrationNotConfigured
-from app.services.google_publisher import GoogleReportPublisher
+from app.services.google_publisher import GoogleReportPublisher, report_file_stem
 
 
 def valid_payload(**overrides):
@@ -53,6 +53,12 @@ def test_google_doc_placeholders_match_legacy_workflow():
         "{{ measures }}",
         "{{ doctor_gender }}",
     }
+
+
+def test_generated_files_only_use_patient_name_and_id():
+    report = PublishReportRequest(**valid_payload())
+
+    assert report_file_stem(report) == "Sofía Araujo - 45691787"
 
 
 def test_gmail_draft_is_rejected_when_feature_is_disabled():

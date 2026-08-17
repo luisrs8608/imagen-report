@@ -23,6 +23,10 @@ def safe_file_part(value: str) -> str:
     return re.sub(r"\s+", " ", value)[:120] or "informe"
 
 
+def report_file_stem(report: PublishReportRequest) -> str:
+    return safe_file_part(f"{report.nombrePaciente} - {report.ciPaciente}")
+
+
 class GoogleReportPublisher:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -36,9 +40,7 @@ class GoogleReportPublisher:
         drive = build("drive", "v3", credentials=credentials, cache_discovery=False)
         docs = build("docs", "v1", credentials=credentials, cache_discovery=False)
 
-        file_stem = safe_file_part(
-            f"{report.fecha.isoformat()} - {report.nombrePaciente} - {report.ciPaciente}"
-        )
+        file_stem = report_file_stem(report)
 
         try:
             copied_document = (

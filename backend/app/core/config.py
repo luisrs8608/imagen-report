@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     google_sheets_service_account_file: str | None = None
     google_sheet_id: str = "1ATTcmm3rs4NjpBoD0113-Oht-YieQx-PdPk3b4SVJqU"
-    google_sheet_range: str = "'Hoja 1'!A11:K"
+    google_sheet_range: str = "'Hoja 1'!A11:L"
     sheet_patient_name_header: str = "NOMBRE"
     sheet_patient_id_header: str = "CEDULA"
     sheet_doctor_header: str = "DR."

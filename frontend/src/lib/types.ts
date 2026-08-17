@@ -27,6 +27,7 @@ export interface Patient {
   ciPaciente: string;
   doctor: string;
   recipientEmail?: string | null;
+  driveUrl?: string | null;
 }
 
 export interface SheetSelection {

@@ -55,7 +55,8 @@ Mantener estos nombres y su capitalización porque reproducen el formulario y el
 - `fecha`: fecha del informe.
 - `measures`: medidas en milímetros.
 - `texto`: informe revisado.
-- `driveUrl`: enlace al estudio.
+- `driveUrl`: enlace al estudio, leído desde la columna `L` de la pestaña seleccionada y editable
+  antes de publicar.
 - `recipientEmail`: correo destinatario leído de la Sheet o introducido manualmente.
 - `createGmailDraft`: elección opcional por informe.
 - `approved`: aprobación médica explícita.

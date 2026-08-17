@@ -16,6 +16,11 @@ EMAIL_CANDIDATE_PATTERN = re.compile(
     r"(?<![\w.+-])[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}(?![\w.-])",
     re.IGNORECASE,
 )
+DRIVE_URL_COLUMN = "L"
+A1_DATA_RANGE_PATTERN = re.compile(
+    r"^(?P<start_col>[A-Z]+)(?P<start_row>\d+):(?P<end_col>[A-Z]+)(?P<end_row>\d*)$",
+    re.IGNORECASE,
+)
 
 
 def normalize_header(value: str) -> str:
@@ -40,6 +45,46 @@ def parse_configured_range(configured_range: str) -> tuple[str, str]:
 def build_sheet_range(sheet_title: str, data_range: str) -> str:
     escaped_title = sheet_title.replace("'", "''")
     return f"'{escaped_title}'!{data_range}"
+
+
+def spreadsheet_column_number(column: str) -> int:
+    result = 0
+    for character in column.upper():
+        if not character.isalpha():
+            raise ValueError("La columna de Google Sheets no es válida.")
+        result = result * 26 + (ord(character) - ord("A") + 1)
+    return result
+
+
+def ensure_range_includes_column(data_range: str, column: str) -> str:
+    """Extend a simple A1 range when the required absolute column is to its right."""
+    match = A1_DATA_RANGE_PATTERN.fullmatch(data_range.strip())
+    if not match:
+        return data_range
+
+    start_number = spreadsheet_column_number(match.group("start_col"))
+    end_number = spreadsheet_column_number(match.group("end_col"))
+    required_number = spreadsheet_column_number(column)
+    if not start_number <= required_number or required_number <= end_number:
+        return data_range
+
+    end_row = match.group("end_row")
+    return (
+        f"{match.group('start_col')}{match.group('start_row')}:"
+        f"{column.upper()}{end_row}"
+    )
+
+
+def column_offset_in_range(data_range: str, column: str) -> int | None:
+    match = A1_DATA_RANGE_PATTERN.fullmatch(data_range.strip())
+    if not match:
+        return None
+    start_number = spreadsheet_column_number(match.group("start_col"))
+    end_number = spreadsheet_column_number(match.group("end_col"))
+    column_number = spreadsheet_column_number(column)
+    if not start_number <= column_number <= end_number:
+        return None
+    return column_number - start_number
 
 
 def extract_valid_email(value: str) -> str | None:
@@ -85,7 +130,7 @@ class SheetsPatientReader:
         if not values:
             return []
 
-        headers, indexes = self._column_indexes(values[0])
+        headers, indexes = self._column_indexes(values[0], data_range)
 
         query_normalized = normalize_header(query)
         start_row = self._range_start_row(data_range)
@@ -128,7 +173,7 @@ class SheetsPatientReader:
         if offset >= len(values):
             return None
 
-        headers, indexes = self._column_indexes(values[0])
+        headers, indexes = self._column_indexes(values[0], data_range)
         return self._patient_from_row(
             row=values[offset],
             headers=headers,
@@ -139,6 +184,7 @@ class SheetsPatientReader:
     def _read_values(self, sheet_name: str | None) -> tuple[list[list[str]], str]:
         service = self._service()
         configured_sheet, data_range = parse_configured_range(self.settings.google_sheet_range)
+        data_range = ensure_range_includes_column(data_range, DRIVE_URL_COLUMN)
 
         try:
             sheet_titles = self._sheet_titles(service)
@@ -171,6 +217,7 @@ class SheetsPatientReader:
     def _column_indexes(
         self,
         header_row: list[str],
+        data_range: str,
     ) -> tuple[list[str], dict[str, int | None]]:
         headers = [normalize_header(str(value)) for value in header_row]
         required = {
@@ -183,6 +230,7 @@ class SheetsPatientReader:
             key: headers.index(header) if header in headers else None
             for key, header in required.items()
         }
+        indexes["drive_url"] = column_offset_in_range(data_range, DRIVE_URL_COLUMN)
         missing = [key for key in ("name", "patient_id", "doctor") if indexes[key] is None]
         if missing:
             raise IntegrationFailed(
@@ -198,7 +246,9 @@ class SheetsPatientReader:
         indexes: dict[str, int | None],
         row_number: int,
     ) -> PatientSummary | None:
-        padded = row + [""] * max(0, len(headers) - len(row))
+        indexed_columns = [index for index in indexes.values() if index is not None]
+        required_length = max(len(headers), max(indexed_columns, default=-1) + 1)
+        padded = row + [""] * max(0, required_length - len(row))
         name = str(padded[indexes["name"]]).strip()  # type: ignore[index]
         patient_id = str(padded[indexes["patient_id"]]).strip()  # type: ignore[index]
         doctor = str(padded[indexes["doctor"]]).strip()  # type: ignore[index]
@@ -207,12 +257,15 @@ class SheetsPatientReader:
 
         email_index = indexes["email"]
         email_cell = str(padded[email_index]) if email_index is not None else ""
+        drive_url_index = indexes["drive_url"]
+        drive_url = str(padded[drive_url_index]).strip() if drive_url_index is not None else ""
         return PatientSummary(
             row_number=row_number,
             nombrePaciente=name,
             ciPaciente=patient_id,
             doctor=doctor,
             recipientEmail=extract_valid_email(email_cell),
+            driveUrl=drive_url or None,
         )
 
     def _service(self):

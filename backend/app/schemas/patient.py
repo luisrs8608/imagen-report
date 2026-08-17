@@ -7,6 +7,7 @@ class PatientSummary(BaseModel):
     ciPaciente: str
     doctor: str
     recipientEmail: EmailStr | None = None
+    driveUrl: str | None = None
 
 
 class SheetSelectionResponse(BaseModel):

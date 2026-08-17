@@ -5,6 +5,8 @@ from app.services.errors import IntegrationFailed
 from app.services.sheets import (
     SheetsPatientReader,
     build_sheet_range,
+    column_offset_in_range,
+    ensure_range_includes_column,
     extract_valid_email,
     parse_configured_range,
 )
@@ -55,7 +57,7 @@ def make_reader():
     return SheetsPatientReader(
         Settings(
             google_sheet_id="sheet-id",
-            google_sheet_range="'Julio 2026'!A11:K",
+            google_sheet_range="'Julio 2026'!A11:L",
         )
     )
 
@@ -69,8 +71,15 @@ def make_service():
         ],
         values={
             "values": [
-                ["NOMBRE", "CEDULA", "DR.", "ENVIO A..."],
-                ["Ana Pérez", "123", "Dra. Silva", "destino@example.com"],
+                ["NOMBRE", "CEDULA", "DR.", "ENVIO A...", *([""] * 7), "ENLACE"],
+                [
+                    "Ana Pérez",
+                    "123",
+                    "Dra. Silva",
+                    "destino@example.com",
+                    *([""] * 7),
+                    "https://drive.google.com/example-study",
+                ],
             ]
         },
     )
@@ -80,6 +89,12 @@ def make_service():
 def test_configured_range_can_be_reused_with_another_sheet():
     assert parse_configured_range("'Julio 2026'!A11:K") == ("Julio 2026", "A11:K")
     assert build_sheet_range("O'Brien", "A11:K") == "'O''Brien'!A11:K"
+
+
+def test_sheet_range_includes_drive_link_column_l():
+    assert ensure_range_includes_column("A11:K", "L") == "A11:L"
+    assert ensure_range_includes_column("A11:M", "L") == "A11:M"
+    assert column_offset_in_range("A11:L", "L") == 11
 
 
 @pytest.mark.parametrize(
@@ -113,9 +128,10 @@ def test_search_reads_the_visually_selected_sheet(monkeypatch):
 
     patients = reader.search("Ana", sheet_name="Agosto 2026")
 
-    assert service.fake_spreadsheets.fake_values.requested_range == "'Agosto 2026'!A11:K"
+    assert service.fake_spreadsheets.fake_values.requested_range == "'Agosto 2026'!A11:L"
     assert patients[0].row_number == 12
     assert patients[0].nombrePaciente == "Ana Pérez"
+    assert patients[0].driveUrl == "https://drive.google.com/example-study"
 
 
 def test_loads_the_exact_patient_row_from_the_selected_sheet(monkeypatch):
@@ -125,10 +141,11 @@ def test_loads_the_exact_patient_row_from_the_selected_sheet(monkeypatch):
 
     patient = reader.get_by_row(12, sheet_name="Agosto 2026")
 
-    assert service.fake_spreadsheets.fake_values.requested_range == "'Agosto 2026'!A11:K"
+    assert service.fake_spreadsheets.fake_values.requested_range == "'Agosto 2026'!A11:L"
     assert patient is not None
     assert patient.row_number == 12
     assert patient.nombrePaciente == "Ana Pérez"
+    assert patient.driveUrl == "https://drive.google.com/example-study"
 
 
 def test_exact_row_returns_none_when_it_is_outside_the_sheet(monkeypatch):
@@ -158,7 +175,7 @@ def test_search_falls_back_to_first_visible_sheet_when_default_was_deleted(monke
     reader = SheetsPatientReader(
         Settings(
             google_sheet_id="sheet-id",
-            google_sheet_range="'Hoja eliminada'!A11:K",
+            google_sheet_range="'Hoja eliminada'!A11:L",
         )
     )
     service = make_service()
@@ -166,4 +183,4 @@ def test_search_falls_back_to_first_visible_sheet_when_default_was_deleted(monke
 
     reader.search("Ana")
 
-    assert service.fake_spreadsheets.fake_values.requested_range == "'Julio 2026'!A11:K"
+    assert service.fake_spreadsheets.fake_values.requested_range == "'Julio 2026'!A11:L"

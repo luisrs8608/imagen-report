@@ -205,7 +205,7 @@ Mantener estos valores ya identificados en `.env`:
 ```dotenv
 GOOGLE_SHEETS_SERVICE_ACCOUNT_FILE=/run/secrets/google-service-account.json
 GOOGLE_SHEET_ID=1ATTcmm3rs4NjpBoD0113-Oht-YieQx-PdPk3b4SVJqU
-GOOGLE_SHEET_RANGE="'Hoja 1'!A11:K"
+GOOGLE_SHEET_RANGE="'Hoja 1'!A11:L"
 SHEET_PATIENT_NAME_HEADER=NOMBRE
 SHEET_PATIENT_ID_HEADER=CEDULA
 SHEET_DOCTOR_HEADER=DR.
@@ -214,7 +214,7 @@ SHEET_RECIPIENT_EMAIL_HEADER=ENVIO A...
 
 La parte anterior a `!` (`Hoja 1`) define únicamente la pestaña que aparecerá seleccionada al
 abrir la aplicación. El backend consulta las pestañas visibles del archivo y el usuario puede
-elegir otra desde **Hoja de trabajo** antes de buscar al paciente. La parte posterior (`A11:K`) se
+elegir otra desde **Hoja de trabajo** antes de buscar al paciente. La parte posterior (`A11:L`) se
 reutiliza para la pestaña elegida.
 
 Además del buscador por nombre, cédula o médico, el formulario permite indicar el **número de fila**
@@ -226,6 +226,7 @@ Por tanto, las pestañas mensuales deben conservar:
 
 - la fila de encabezados en la misma posición;
 - las mismas columnas para nombre, cédula, médico y correo;
+- el enlace del estudio en Google Drive en la columna `L`;
 - un nombre de pestaña diferente y reconocible, por ejemplo `Julio 2026` y `Agosto 2026`.
 
 Las pestañas ocultas no aparecen en el selector. La elección se recuerda por usuario en ese

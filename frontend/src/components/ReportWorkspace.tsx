@@ -207,6 +207,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
       ciPaciente: patient.ciPaciente,
       doctor: patient.doctor,
       recipientEmail: patient.recipientEmail || '',
+      driveUrl: patient.driveUrl || '',
     }));
     setPatients([]);
     setQuery('');
