@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+secrets/
+backend/app.db
+app.db
+frontend/node_modules/
+frontend/dist/
+coverage/

@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: imagen-report-backend
+Version: 0.1.0
+Summary: Backend para dictado, generación y publicación de informes odontológicos.
+Requires-Python: >=3.12
+Requires-Dist: fastapi<1,>=0.139
+Requires-Dist: uvicorn[standard]<1,>=0.35
+Requires-Dist: sqlalchemy<3,>=2.0.40
+Requires-Dist: psycopg[binary]<4,>=3.2
+Requires-Dist: pydantic-settings<3,>=2.8
+Requires-Dist: pwdlib[argon2]<1,>=0.3
+Requires-Dist: google-api-python-client<3,>=2.170
+Requires-Dist: google-auth<3,>=2.40
+Requires-Dist: google-auth-oauthlib<2,>=1.2
+Requires-Dist: google-genai<2,>=1.30
+Requires-Dist: email-validator<3,>=2.2
+Provides-Extra: dev
+Requires-Dist: httpx<1,>=0.28; extra == "dev"
+Requires-Dist: pytest<9,>=8.3; extra == "dev"
+Requires-Dist: ruff<1,>=0.12; extra == "dev"
