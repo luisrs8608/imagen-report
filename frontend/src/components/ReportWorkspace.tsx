@@ -20,6 +20,7 @@ import {
 import { apiRequest } from '../lib/api';
 import type { SpeechRecognitionLike } from '../lib/speech';
 import type { AppConfig, Patient, PublishResult, ReportForm, User } from '../lib/types';
+import { ReportDraftEditor } from './ReportDraftEditor';
 import { UserManagementPanel } from './UserManagementPanel';
 
 function createInitialForm(): ReportForm {
@@ -49,6 +50,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
   const [query, setQuery] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [transcript, setTranscript] = useState('');
+  const [generatedDraft, setGeneratedDraft] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [recording, setRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
@@ -189,6 +191,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
         method: 'POST',
         body: JSON.stringify({ transcript }),
       });
+      setGeneratedDraft(response.report);
       setForm((current) => ({ ...current, texto: response.report, approved: false }));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No fue posible generar el borrador.');
@@ -233,6 +236,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
     setQuery('');
     setPatients([]);
     setTranscript('');
+    setGeneratedDraft('');
     setInterimTranscript('');
     setBusyAction(null);
     setError('');
@@ -360,12 +364,15 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
             <div className="card-header">
               <div><Sparkles size={19} /><div><h2>Borrador técnico</h2><p>Generado por IA; requiere revisión profesional.</p></div></div>
             </div>
-            <textarea className="editor report" value={form.texto} onChange={(event) => updateField('texto', event.target.value)} placeholder="Genere el borrador y edítelo aquí..." required />
-            <div className="button-row">
-              <button type="button" className="ai-button" onClick={generateDraft} disabled={!transcript.trim() || busyAction === 'generate'}>
-                {busyAction === 'generate' ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />} Generar borrador
-              </button>
-            </div>
+            <ReportDraftEditor
+              value={form.texto}
+              generatedDraft={generatedDraft}
+              approved={form.approved}
+              canGenerate={Boolean(transcript.trim())}
+              isGenerating={busyAction === 'generate'}
+              onChange={(value) => updateField('texto', value)}
+              onGenerate={generateDraft}
+            />
             <label className="approval-box">
               <input type="checkbox" checked={form.approved} onChange={(event) => updateField('approved', event.target.checked)} disabled={!form.texto.trim()} />
               <span><strong>Informe revisado y aprobado</strong><small>Confirmo que el texto fue verificado por un profesional.</small></span>

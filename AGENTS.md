@@ -101,6 +101,11 @@ salida. Los valores `GOOGLE_DOCS_TEMPLATE_ID` y `GOOGLE_DRIVE_OUTPUT_FOLDER_ID` 
 `GMAIL_DRAFT_ENABLED=false` desactiva toda la función de borrador. Con `true`, sigue siendo opcional
 para cada informe. `gmail.compose` permite crear el borrador; no agregar envío automático.
 
+La implementación actual usa los scopes restringidos `drive` y `gmail.compose`. Una audiencia
+External en Testing sirve para desarrollo, pero no es una solución operativa estable porque su
+refresh token puede caducar a los siete días. Revisar la sección 6.10 de
+`CONFIGURACION_LOCAL.md` antes de preparar producción o cambiar estos scopes.
+
 SMTP para OTP y OAuth de Gmail para borradores son integraciones independientes.
 
 ## Archivos principales del backend
@@ -121,6 +126,7 @@ SMTP para OTP y OAuth de Gmail para borradores son integraciones independientes.
 - `frontend/src/App.tsx`: sesión y vista raíz.
 - `frontend/src/components/LoginPanel.tsx`: acceso y OTP.
 - `frontend/src/components/ReportWorkspace.tsx`: flujo completo del informe.
+- `frontend/src/components/ReportDraftEditor.tsx`: edición, revisión y herramientas del borrador.
 - `frontend/src/components/UserManagementPanel.tsx`: administración de usuarios.
 - `frontend/src/lib/api.ts`: cliente HTTP.
 - `frontend/src/lib/types.ts`: contrato TypeScript.

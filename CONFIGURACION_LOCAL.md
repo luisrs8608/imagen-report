@@ -131,6 +131,10 @@ Esta integración utiliza una cuenta de servicio distinta de la cuenta Google au
 Docs, Drive y Gmail. La cuenta de servicio solo necesita leer la Sheet; no se le debe dar acceso a
 la plantilla ni a la carpeta de informes.
 
+Antes de comenzar, la cuenta que administra Google Cloud debe poder crear proyectos, habilitar
+APIs y crear cuentas de servicio. Si el proyecto pertenece a una organización, un administrador
+puede haber restringido alguna de esas acciones.
+
 ### 4.1 Crear o seleccionar el proyecto de Google Cloud
 
 1. Entrar en [Google Cloud Console](https://console.cloud.google.com/) con la cuenta que
@@ -145,18 +149,27 @@ la plantilla ni a la carpeta de informes.
 1. Dentro del proyecto, abrir **APIs y servicios > Biblioteca**.
 2. Buscar `Google Sheets API`.
 3. Abrir el resultado oficial y pulsar **Habilitar**.
+4. Entrar en **APIs y servicios > APIs y servicios habilitados** y confirmar que aparece
+   `Google Sheets API`.
+
+El identificador técnico de esta API es `sheets.googleapis.com`. No hace falta habilitar Google
+Drive API para que la cuenta de servicio lea una Sheet que se compartió directamente con ella.
 
 ### 4.3 Crear la cuenta de servicio y descargar su clave
 
 1. Abrir **IAM y administración > Cuentas de servicio**.
 2. Pulsar **Crear cuenta de servicio**.
 3. Usar un nombre reconocible, por ejemplo `imagen-report-sheets-reader`.
-4. En los pasos de roles del proyecto se puede pulsar **Continuar** sin asignar roles. El acceso a
-   la Sheet se otorgará compartiendo el archivo concreto y no dando permisos globales al proyecto.
-5. Abrir la cuenta de servicio creada y entrar en la pestaña **Claves**.
-6. Pulsar **Agregar clave > Crear clave nueva > JSON**.
-7. Descargar el archivo. La clave privada solo se muestra en esa descarga; debe tratarse como un
-   secreto.
+4. Pulsar **Crear y continuar** o **Listo**, según lo que muestre la consola.
+5. En el paso **Otorgar a esta cuenta de servicio acceso al proyecto**, no asignar roles IAM. El
+   acceso a la Sheet se otorgará compartiendo el archivo concreto y no dando permisos globales al
+   proyecto.
+6. Finalizar la creación y copiar el correo de la cuenta de servicio, con formato
+   `nombre@proyecto.iam.gserviceaccount.com`.
+7. Abrir la cuenta de servicio creada y entrar en la pestaña **Claves**.
+8. Pulsar **Agregar clave > Crear clave nueva > JSON > Crear**.
+9. Guardar la descarga en un lugar temporal seguro. Google no permite volver a descargar esa misma
+   clave privada; si se pierde, hay que generar otra.
 
 Desde la raíz del proyecto, crear la carpeta local y copiar allí el JSON con el nombre esperado:
 
@@ -166,15 +179,26 @@ cp /ruta/de/la/descarga.json secrets/google-service-account.json
 chmod 600 secrets/google-service-account.json
 ```
 
-No agregar este archivo a Git ni compartirlo por correo o chat.
+No agregar este archivo a Git ni compartirlo por correo o chat. Si la opción de crear una clave
+está deshabilitada, comprobar que la cuenta tenga permiso para administrar claves. En proyectos de
+una organización también puede estar activa la política
+`iam.disableServiceAccountKeyCreation`; no se debe desactivar globalmente sin autorización del
+administrador.
 
 ### 4.4 Dar acceso de lectura a la Sheet
 
-1. Abrir `secrets/google-service-account.json` localmente y copiar el valor de `client_email`.
+1. Copiar desde Google Cloud el correo de la cuenta de servicio. Como alternativa, es el valor
+   `client_email` de `secrets/google-service-account.json`.
 2. Abrir la Google Sheet usada por la institución.
 3. Pulsar **Compartir**, pegar ese correo y asignar el rol **Lector**.
-4. No asignar **Editor**: la aplicación solo consulta estos datos.
-5. Confirmar que el rango configurado comienza en la fila que contiene los encabezados.
+4. Si aparece la opción **Notificar a las personas**, desmarcarla: la cuenta de servicio no tiene
+   una bandeja de correo.
+5. No asignar **Editor**: la aplicación solo consulta estos datos.
+6. Confirmar que el rango configurado comienza en la fila que contiene los encabezados.
+
+Los roles IAM del proyecto no dan acceso a archivos de Google Workspace. El permiso efectivo para
+esta Sheet es el que se acaba de otorgar desde el botón **Compartir**; no hace falta delegación de
+todo el dominio ni un rol de administrador de Workspace.
 
 Mantener estos valores ya identificados en `.env`:
 
@@ -192,6 +216,15 @@ La ruta `/run/secrets/...` es la ruta interna del contenedor; Docker monta la ca
 `./secrets` en `/run/secrets` en modo de solo lectura. No hay que crear una carpeta `run` en el
 proyecto ni poner la ruta absoluta de la Mac en `.env` cuando se usa Compose.
 
+Después de levantar los contenedores, se puede comprobar que el backend ve la clave sin mostrar su
+contenido:
+
+```bash
+docker compose exec backend test -r /run/secrets/google-service-account.json
+```
+
+El comando termina sin salida cuando el archivo existe y es legible.
+
 ## 5. Configurar Gemini
 
 1. Crear una API key en Google AI Studio dentro del proyecto que se utilizará.
@@ -200,7 +233,7 @@ proyecto ni poner la ruta absoluta de la Mac en `.env` cuando se usa Compose.
 
 ```dotenv
 GEMINI_API_KEY=pegar-aqui-la-clave-real
-GEMINI_MODEL=gemini-3.6-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 La clave solo es leída por FastAPI y nunca llega al navegador.
@@ -211,6 +244,9 @@ La cuenta autorizada puede ser un Gmail personal o una cuenta de Google Workspac
 integración usa OAuth con acceso offline y es independiente de la cuenta de servicio de la sección
 4. La misma autorización permite que el backend copie la plantilla, escriba el informe, exporte el
 PDF y, solo si se habilita, cree un borrador en Gmail.
+
+Los usuarios internos de Imagen Report no realizan este OAuth. Se autoriza una sola cuenta Google
+durante la configuración del backend y todos los documentos y borradores se crean con esa cuenta.
 
 ### 6.1 Preparar la cuenta, la plantilla y la carpeta
 
@@ -245,6 +281,17 @@ PDF y, solo si se habilita, cree un borrador en Gmail.
 5. Para la primera prueba sin Gmail no hace falta habilitar Gmail API todavía.
 6. Si se probarán borradores, buscar y habilitar también **Gmail API**.
 
+En **APIs y servicios > APIs y servicios habilitados**, comprobar esta lista:
+
+| API | Identificador técnico | Obligatoria |
+| --- | --- | --- |
+| Google Sheets API | `sheets.googleapis.com` | Sí |
+| Google Drive API | `drive.googleapis.com` | Sí |
+| Google Docs API | `docs.googleapis.com` | Sí |
+| Gmail API | `gmail.googleapis.com` | Solo para borradores |
+
+No hace falta habilitar Google Keep, Admin SDK, Google Picker ni una API de PDF.
+
 ### 6.3 Configurar Google Auth Platform y la pantalla de consentimiento
 
 La consola actual agrupa esta configuración en **Google Auth Platform**. Según el idioma o la
@@ -252,17 +299,25 @@ versión de la consola, también puede aparecer bajo **APIs y servicios > Pantal
 OAuth**.
 
 1. Abrir **Google Auth Platform > Branding** y pulsar **Comenzar** si todavía no está configurado.
-2. Completar un nombre de aplicación, por ejemplo `Imagen Report`.
-3. Indicar un correo de asistencia del usuario y un correo de contacto del desarrollador.
-4. En **Audience**, elegir:
+2. En **Información de la aplicación**, escribir un nombre, por ejemplo `Imagen Report`.
+3. Seleccionar el **Correo electrónico de asistencia al usuario** y pulsar **Siguiente**.
+4. En **Audience / Público**, elegir:
    - **External** si se usa Gmail personal o si podrán autorizar cuentas fuera de una organización
      Workspace;
    - **Internal** únicamente si el proyecto pertenece a Google Workspace y todos los usuarios
      autorizados son de esa organización.
-5. Si la audiencia es **External** y el estado es **Testing**, abrir **Audience > Test users** y
+5. Pulsar **Siguiente** e ingresar un correo en **Información de contacto** para recibir avisos
+   sobre el proyecto.
+6. Pulsar **Siguiente**, leer la Política de Datos del Usuario de los Servicios de las APIs de
+   Google, marcar su aceptación y pulsar **Continuar > Crear**.
+7. Si la audiencia es **External** y el estado es **Testing**, abrir **Audience / Público > Test
+   users / Usuarios de prueba** y
    agregar exactamente la cuenta Gmail que se usará al ejecutar el asistente OAuth.
-6. Guardar los cambios. No es necesario publicar la aplicación para una prueba controlada con un
+8. Guardar los cambios. No es necesario publicar la aplicación para una prueba controlada con un
    usuario agregado como usuario de prueba.
+
+Con Gmail personal, elegir siempre **External**. La opción **Internal** solo está disponible para
+proyectos asociados a una organización Google Workspace.
 
 ### 6.4 Declarar los permisos OAuth
 
@@ -283,9 +338,15 @@ El permiso `drive` se usa para copiar la plantilla, exportar el documento y guar
 permiso `documents` permite reemplazar los marcadores de la copia. `gmail.compose` permite crear y
 modificar borradores; la aplicación no llama al endpoint de envío.
 
-Google clasifica algunos permisos amplios como sensibles o restringidos. El modo **Testing** con
-usuarios de prueba es suficiente para la validación local. Antes de una publicación externa y
-continua puede ser necesario completar la verificación solicitada por Google.
+Los scopes deben coincidir con los que solicita `backend/scripts/google_oauth_setup.py`. Agregarlos
+en Google Cloud define lo que la aplicación puede solicitar; el script determina cuáles solicita
+en la autorización concreta.
+
+Google clasifica `drive` y `gmail.compose` como scopes restringidos. El proyecto los necesita con
+la implementación actual porque trabaja con una plantilla y una carpeta preexistentes sin Google
+Picker, y porque debe crear un borrador normal con un adjunto. El modo **Testing** con usuarios de
+prueba es suficiente para validar localmente, pero no debe confundirse con una configuración de
+producción definitiva. La sección 6.10 explica esta diferencia.
 
 ### 6.5 Crear el cliente OAuth de escritorio
 
@@ -313,6 +374,10 @@ secrets/
 No intercambiarlos: el primero contiene una cuenta de servicio y el segundo un cliente OAuth de
 escritorio. Ninguno debe agregarse a Git.
 
+No crear un cliente de tipo **Web application** y no agregar manualmente orígenes JavaScript ni
+URI de redirección. El asistente incluido inicia temporalmente un callback en `localhost` con un
+puerto aleatorio, comportamiento previsto para un cliente de escritorio.
+
 ### 6.6 Generar la autorización para Docs y Drive
 
 Preparar una instalación local del backend:
@@ -336,6 +401,12 @@ El asistente abre el navegador. Allí se debe:
 3. Revisar y aceptar los permisos de Drive y Docs.
 4. Esperar el mensaje de autorización completada y volver a la terminal.
 
+El comando debe ejecutarse directamente en la computadora que tiene el navegador, no dentro del
+contenedor, porque necesita recibir el callback OAuth en `localhost`. Si Google muestra **Esta
+aplicación no está verificada**, comprobar primero que el nombre del proyecto, el cliente y la
+cuenta sean propios; durante una prueba controlada se puede continuar mediante **Avanzado**. Nunca
+continuar si el proyecto o la cuenta mostrados no son los esperados.
+
 El script imprime tres variables. Copiarlas en el `.env` local, sin comillas adicionales y sin
 publicarlas en el repositorio:
 
@@ -345,6 +416,9 @@ GOOGLE_OAUTH_CLIENT_SECRET=valor-impreso-por-el-script
 GOOGLE_OAUTH_REFRESH_TOKEN=valor-impreso-por-el-script
 GOOGLE_OAUTH_TOKEN_URI=https://oauth2.googleapis.com/token
 ```
+
+No copiar el JSON completo dentro de `.env`. El backend necesita las tres variables impresas y no
+lee `google-oauth-client.json` durante la ejecución normal.
 
 ### 6.7 Obtener los identificadores de la plantilla y la carpeta
 
@@ -367,6 +441,11 @@ GMAIL_USER_ID=me
 No es necesario que la plantilla o la carpeta tengan un nombre concreto. Lo importante es que los
 IDs sean correctos y que la cuenta autorizada tenga acceso. Con `GMAIL_DRAFT_ENABLED=false`, Docs y
 Drive funcionan normalmente y la aplicación no ofrece crear el correo.
+
+Si la carpeta está en **Mi unidad** de la misma cuenta autorizada, no hay que compartirla con nadie
+más. Si pertenece a otra cuenta o está compartida, la cuenta OAuth debe tener un permiso que le
+permita crear archivos. Abrir tanto la plantilla como la carpeta estando conectado con esa cuenta
+es la comprobación más simple antes de probar la aplicación.
 
 ### 6.8 Habilitar y autorizar los borradores de Gmail
 
@@ -397,6 +476,10 @@ además el borrador con el PDF adjunto. El backend nunca envía el correo autom�
 
 La autorización OAuth de Gmail es diferente del SMTP usado para enviar el código OTP. Habilitar
 una no configura la otra.
+
+Cada vez que se agregue o quite un scope hay que volver a ejecutar el asistente y reemplazar el
+refresh token. Activar solamente `GMAIL_DRAFT_ENABLED=true` no agrega permisos Gmail a un token
+generado sin `--with-gmail`.
 
 ### 6.9 Reiniciar y comprobar la configuración
 
@@ -432,8 +515,51 @@ de prueba y el refresh token puede caducar a los siete días. Esto es aceptable 
 inicial. Para uso continuo hay que revisar el estado de publicación y los requisitos de
 verificación de Google.
 
+### 6.10 Pasar de Testing a uso continuo
+
+Antes de usar esta integración de manera continua, decidir una de estas rutas con el responsable
+de la cuenta Google:
+
+1. **Google Workspace e Internal:** si la institución adopta Workspace y el proyecto pertenece a
+   esa organización, una audiencia interna evita el flujo de verificación externa para usuarios
+   de la misma organización.
+2. **Gmail personal o audiencia External:** cambiar el estado de publicación cuando corresponda y
+   revisar en Google Auth Platform los requisitos de verificación. Los scopes `drive` y
+   `gmail.compose` son restringidos. Una aplicación pública que almacena o transmite datos
+   obtenidos mediante scopes restringidos puede requerir verificación de OAuth y una evaluación de
+   seguridad de Google.
+3. **Mantener Testing temporalmente:** es válido para desarrollar, pero hay que asumir que el
+   refresh token expira a los siete días y repetir la autorización. No es una solución operativa
+   estable.
+
+Publicar el sitio de Imagen Report en Internet y publicar la aplicación OAuth son acciones
+distintas. Aunque los usuarios de Imagen Report no vean el consentimiento de Google, el backend
+sigue utilizando el refresh token de la cuenta autorizada y debe cumplir el estado OAuth elegido.
+
+### 6.11 Lista de comprobación de Google Cloud
+
+Antes de probar un informe, confirmar:
+
+- [ ] El proyecto correcto está seleccionado en Google Cloud.
+- [ ] Sheets, Drive y Docs API figuran habilitadas.
+- [ ] Gmail API está habilitada solo si se probarán borradores.
+- [ ] La cuenta de servicio no recibió roles IAM innecesarios.
+- [ ] La Sheet está compartida con el correo de la cuenta de servicio como **Lector**.
+- [ ] Google Auth Platform tiene nombre, correos de contacto y audiencia configurados.
+- [ ] La cuenta Gmail autorizada está en **Usuarios de prueba** si la audiencia es External/Testing.
+- [ ] Los scopes de Drive y Docs están declarados; `gmail.compose` solo si corresponde.
+- [ ] El cliente OAuth es **Desktop app**.
+- [ ] Los dos JSON están en `secrets/` con sus nombres correctos.
+- [ ] El refresh token se generó con `--with-gmail` si Gmail está habilitado.
+- [ ] La plantilla es Google Docs nativo y conserva todos los marcadores.
+- [ ] La cuenta OAuth puede abrir la plantilla y crear archivos en la carpeta de salida.
+- [ ] `.env` contiene los IDs, credenciales OAuth y la bandera Gmail correctos.
+- [ ] El backend fue recreado después de modificar `.env`.
+
 Referencias oficiales de Google: [pantalla de consentimiento OAuth](https://developers.google.com/workspace/guides/configure-oauth-consent),
+[habilitación de APIs de Workspace](https://developers.google.com/workspace/guides/enable-apis),
 [credenciales OAuth](https://developers.google.com/workspace/guides/create-credentials),
+[creación y protección de claves de cuenta de servicio](https://cloud.google.com/iam/docs/keys-create-delete),
 [permisos de Drive](https://developers.google.com/workspace/drive/api/guides/api-specific-auth),
 [permisos de Gmail](https://developers.google.com/workspace/gmail/api/auth/scopes) y
 [ciclo de vida de tokens OAuth](https://developers.google.com/identity/protocols/oauth2).

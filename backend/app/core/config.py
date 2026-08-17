@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     sheet_recipient_email_header: str = "ENVIO A..."
 
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.6-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
 
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: str | None = None
