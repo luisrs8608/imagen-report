@@ -160,6 +160,25 @@ button:not(:disabled):active { transform: translateY(1px); }
 .field-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .span-two-fields { grid-column: span 2; }
 .search-row { display: flex; gap: 0.7rem; align-items: end; margin-bottom: 0.9rem; }
+.sheet-search-row { align-items: flex-start; }
+.sheet-search-button { align-self: flex-start; margin-top: 1.38rem; }
+.sheet-selector { width: min(260px, 30%); flex: none; }
+.sheet-selector small { color: #7b909b; font-size: 0.62rem; font-weight: 550; line-height: 1.35; }
+.row-lookup-row {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  margin: -0.1rem 0 0.9rem;
+  padding: 0.7rem;
+  border: 1px solid #e1e9ed;
+  border-radius: 11px;
+  background: #f8fbfc;
+}
+.row-lookup-copy { display: grid; align-self: center; margin-right: auto; }
+.row-lookup-copy strong { color: #315566; font-size: 0.73rem; }
+.row-lookup-copy small { color: #7b909b; font-size: 0.64rem; }
+.row-lookup-row label { width: 145px; }
 .grow { flex: 1; }
 .align-end { align-self: end; }
 .input-with-icon { position: relative; }
@@ -393,7 +412,10 @@ button:not(:disabled):active { transform: translateY(1px); }
   .workspace { width: min(100% - 1rem, 1240px); padding-top: 1.25rem; }
   .field-grid.three { grid-template-columns: 1fr; }
   .span-two-fields { grid-column: auto; }
-  .search-row, .button-row { flex-direction: column; align-items: stretch; }
+  .search-row, .button-row, .row-lookup-row { flex-direction: column; align-items: stretch; }
+  .sheet-selector { width: 100%; }
+  .sheet-search-button { align-self: stretch; margin-top: 0; }
+  .row-lookup-row label { width: 100%; }
   .secondary-button.align-end { align-self: stretch; }
   .auth-card { padding: 1.4rem; }
   .admin-nav-button { width: 38px; height: 38px; padding: 0; justify-content: center; font-size: 0; }

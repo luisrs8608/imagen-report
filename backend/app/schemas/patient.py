@@ -7,3 +7,8 @@ class PatientSummary(BaseModel):
     ciPaciente: str
     doctor: str
     recipientEmail: EmailStr | None = None
+
+
+class SheetSelectionResponse(BaseModel):
+    sheets: list[str]
+    default_sheet: str

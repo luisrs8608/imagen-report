@@ -212,6 +212,26 @@ SHEET_DOCTOR_HEADER=DR.
 SHEET_RECIPIENT_EMAIL_HEADER=ENVIO A...
 ```
 
+La parte anterior a `!` (`Hoja 1`) define únicamente la pestaña que aparecerá seleccionada al
+abrir la aplicación. El backend consulta las pestañas visibles del archivo y el usuario puede
+elegir otra desde **Hoja de trabajo** antes de buscar al paciente. La parte posterior (`A11:K`) se
+reutiliza para la pestaña elegida.
+
+Además del buscador por nombre, cédula o médico, el formulario permite indicar el **número de fila**
+de la pestaña seleccionada. Esta opción carga exactamente ese registro y sirve para distinguir
+estudios repetidos del mismo paciente. El número corresponde al que muestra Google Sheets en el
+margen izquierdo; no es la posición relativa dentro del rango configurado.
+
+Por tanto, las pestañas mensuales deben conservar:
+
+- la fila de encabezados en la misma posición;
+- las mismas columnas para nombre, cédula, médico y correo;
+- un nombre de pestaña diferente y reconocible, por ejemplo `Julio 2026` y `Agosto 2026`.
+
+Las pestañas ocultas no aparecen en el selector. La elección se recuerda por usuario en ese
+navegador, se mantiene al comenzar un nuevo informe y no cambia la hoja predeterminada ni afecta a
+otros usuarios conectados. Si la pestaña recordada deja de existir, se vuelve a la predeterminada.
+
 La ruta `/run/secrets/...` es la ruta interna del contenedor; Docker monta la carpeta local
 `./secrets` en `/run/secrets` en modo de solo lectura. No hay que crear una carpeta `run` en el
 proyecto ni poner la ruta absoluta de la Mac en `.env` cuando se usa Compose.
@@ -615,8 +635,8 @@ Abrir `http://localhost` en Chrome. La documentación técnica queda en
 1. Iniciar sesión con `BOOTSTRAP_ADMIN_USERNAME` y `BOOTSTRAP_ADMIN_PASSWORD`.
 2. Usar el código recibido por correo. Mientras `APP_ENV=development`, también aparecerá en la
    pantalla para no bloquear la prueba si SMTP aún no está configurado.
-3. Buscar un paciente por nombre o cédula y confirmar que llegan nombre, cédula, médico y, cuando
-   existe, correo destinatario desde la Sheet.
+3. Seleccionar la pestaña o período de trabajo, buscar un paciente por nombre o cédula y confirmar
+   que llegan nombre, cédula, médico y, cuando existe, correo destinatario desde esa pestaña.
 4. Permitir el micrófono cuando Chrome lo solicite, dictar un texto y detener el dictado.
 5. Corregir manualmente la transcripción y pedir el borrador técnico a Gemini.
 6. Editar el borrador final, completar fecha, medidas y enlace de Drive.

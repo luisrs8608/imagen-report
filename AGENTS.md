@@ -28,7 +28,10 @@ suite automatizada.
 
 1. Un usuario interno introduce usuario y contraseña.
 2. La aplicación envía un OTP al correo autorizado; en desarrollo también lo muestra en pantalla.
-3. El usuario busca o selecciona los datos del paciente desde la Google Sheet de solo lectura.
+3. El usuario elige una pestaña visible de la Google Sheet y busca allí los datos del paciente. La
+   pestaña se recuerda por usuario en el navegador; el archivo y el rango de celdas continúan
+   configurados en el backend y la integración sigue siendo de solo lectura. También puede cargar
+   el número de fila exacto de Google Sheets para distinguir estudios repetidos del mismo paciente.
 4. El navegador captura el dictado mediante reconocimiento de voz; el audio no se conserva.
 5. El backend envía el texto a Gemini y devuelve un borrador técnico.
 6. El profesional edita el informe y debe aprobarlo expresamente.

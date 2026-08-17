@@ -5,7 +5,7 @@ Aplicación web para generar informes radiológicos odontológicos a partir de u
 ## Flujo funcional
 
 1. Un usuario interno inicia sesión con contraseña y un código enviado a su correo autorizado.
-2. Busca al paciente en una Google Sheet de solo lectura o completa los mismos campos del formulario anterior.
+2. Selecciona visualmente la pestaña o período de la Google Sheet y busca allí al paciente por nombre, cédula o médico. También puede cargar una fila exacta cuando existen registros repetidos.
 3. Dicta el informe mediante el reconocimiento de voz del navegador y puede corregir la transcripción.
 4. FastAPI envía únicamente el texto a Gemini para producir un borrador técnico.
 5. El profesional edita y aprueba expresamente el informe.

@@ -29,6 +29,11 @@ export interface Patient {
   recipientEmail?: string | null;
 }
 
+export interface SheetSelection {
+  sheets: string[];
+  default_sheet: string;
+}
+
 export interface ReportForm {
   recordData: string;
   ciPaciente: string;

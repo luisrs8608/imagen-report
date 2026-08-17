@@ -4,6 +4,7 @@ import {
   ClipboardPaste,
   FileCheck2,
   FileText,
+  Hash,
   Loader2,
   LogOut,
   Mail,
@@ -19,7 +20,7 @@ import {
 
 import { apiRequest } from '../lib/api';
 import type { SpeechRecognitionLike } from '../lib/speech';
-import type { AppConfig, Patient, PublishResult, ReportForm, User } from '../lib/types';
+import type { AppConfig, Patient, PublishResult, ReportForm, SheetSelection, User } from '../lib/types';
 import { ReportDraftEditor } from './ReportDraftEditor';
 import { UserManagementPanel } from './UserManagementPanel';
 
@@ -48,13 +49,17 @@ interface ReportWorkspaceProps {
 export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
   const [form, setForm] = useState<ReportForm>(createInitialForm);
   const [query, setQuery] = useState('');
+  const [rowNumber, setRowNumber] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState('');
+  const [loadingSheets, setLoadingSheets] = useState(true);
   const [transcript, setTranscript] = useState('');
   const [generatedDraft, setGeneratedDraft] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [recording, setRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
-  const [busyAction, setBusyAction] = useState<'search' | 'generate' | 'publish' | null>(null);
+  const [busyAction, setBusyAction] = useState<'search' | 'row' | 'generate' | 'publish' | null>(null);
   const [error, setError] = useState('');
   const [result, setResult] = useState<PublishResult | null>(null);
   const [gmailDraftEnabled, setGmailDraftEnabled] = useState(false);
@@ -69,6 +74,27 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
       .then((config) => setGmailDraftEnabled(config.gmail_draft_enabled))
       .catch(() => setGmailDraftEnabled(false));
   }, []);
+
+  useEffect(() => {
+    apiRequest<SheetSelection>('/patients/sheets')
+      .then((selection) => {
+        const storageKey = `imagen-report:selected-sheet:${user.id}`;
+        const rememberedSheet = window.localStorage.getItem(storageKey);
+        const initialSheet = rememberedSheet && selection.sheets.includes(rememberedSheet)
+          ? rememberedSheet
+          : selection.default_sheet;
+        setSheetNames(selection.sheets);
+        setSelectedSheet(initialSheet);
+      })
+      .catch((requestError: unknown) => {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'No fue posible consultar las hojas disponibles.',
+        );
+      })
+      .finally(() => setLoadingSheets(false));
+  }, [user.id]);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -135,9 +161,40 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
     setBusyAction('search');
     setError('');
     try {
-      setPatients(await apiRequest<Patient[]>(`/patients?query=${encodeURIComponent(query.trim())}`));
+      const sheetParameter = selectedSheet
+        ? `&sheet=${encodeURIComponent(selectedSheet)}`
+        : '';
+      setPatients(
+        await apiRequest<Patient[]>(
+          `/patients?query=${encodeURIComponent(query.trim())}${sheetParameter}`,
+        ),
+      );
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No fue posible consultar la planilla.');
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function loadPatientByRow() {
+    const parsedRow = Number(rowNumber);
+    if (!Number.isInteger(parsedRow) || parsedRow < 1) return;
+    setBusyAction('row');
+    setError('');
+    try {
+      const sheetParameter = selectedSheet
+        ? `?sheet=${encodeURIComponent(selectedSheet)}`
+        : '';
+      const patient = await apiRequest<Patient>(
+        `/patients/row/${parsedRow}${sheetParameter}`,
+      );
+      selectPatient(patient);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'No fue posible cargar la fila indicada.',
+      );
     } finally {
       setBusyAction(null);
     }
@@ -153,6 +210,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
     }));
     setPatients([]);
     setQuery('');
+    setRowNumber('');
   }
 
   function parseRecordData(value: string) {
@@ -234,6 +292,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
     setRecording(false);
     setForm(createInitialForm());
     setQuery('');
+    setRowNumber('');
     setPatients([]);
     setTranscript('');
     setGeneratedDraft('');
@@ -302,13 +361,87 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
               <div><UserRound size={19} /><div><h2>Paciente y solicitante</h2><p>Datos de la Google Sheet o ingreso asistido.</p></div></div>
             </div>
 
-            <div className="search-row">
+            <div className="search-row sheet-search-row">
+              <label className="sheet-selector">
+                Hoja de trabajo
+                <select
+                  value={selectedSheet}
+                  onChange={(event) => {
+                    const sheetName = event.target.value;
+                    setSelectedSheet(sheetName);
+                    window.localStorage.setItem(
+                      `imagen-report:selected-sheet:${user.id}`,
+                      sheetName,
+                    );
+                    setPatients([]);
+                  }}
+                  disabled={loadingSheets || sheetNames.length === 0}
+                >
+                  {loadingSheets && <option value="">Cargando hojas…</option>}
+                  {!loadingSheets && sheetNames.length === 0 && (
+                    <option value="">Hoja configurada por defecto</option>
+                  )}
+                  {sheetNames.map((sheetName) => (
+                    <option key={sheetName} value={sheetName}>{sheetName}</option>
+                  ))}
+                </select>
+                <small>Seleccione el mes o período que desea consultar.</small>
+              </label>
               <label className="grow">
                 Buscar por nombre, cédula o médico
-                <div className="input-with-icon"><Search size={17} /><input ref={patientSearchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Escriba al menos dos caracteres" /></div>
+                <div className="input-with-icon">
+                  <Search size={17} />
+                  <input
+                    ref={patientSearchRef}
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                      event.preventDefault();
+                      if (busyAction === 'search' || query.trim().length < 2) return;
+                      void searchPatients();
+                    }}
+                    placeholder="Escriba al menos dos caracteres"
+                  />
+                </div>
               </label>
-              <button className="secondary-button align-end" type="button" onClick={searchPatients} disabled={busyAction === 'search' || query.trim().length < 2}>
+              <button className="secondary-button sheet-search-button" type="button" onClick={searchPatients} disabled={busyAction === 'search' || query.trim().length < 2}>
                 {busyAction === 'search' ? <Loader2 className="spin" size={17} /> : <Search size={17} />} Consultar
+              </button>
+            </div>
+
+            <div className="row-lookup-row">
+              <div className="row-lookup-copy">
+                <strong>Cargar una fila exacta</strong>
+                <small>Úselo cuando un paciente figure más de una vez en la hoja seleccionada.</small>
+              </div>
+              <label>
+                Número de fila
+                <div className="input-with-icon">
+                  <Hash size={17} />
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    value={rowNumber}
+                    onChange={(event) => setRowNumber(event.target.value)}
+                    placeholder="Ej. 42"
+                  />
+                </div>
+              </label>
+              <button
+                className="secondary-button align-end"
+                type="button"
+                onClick={loadPatientByRow}
+                disabled={
+                  busyAction === 'row'
+                  || !Number.isInteger(Number(rowNumber))
+                  || Number(rowNumber) < 1
+                }
+              >
+                {busyAction === 'row' ? <Loader2 className="spin" size={17} /> : <Hash size={17} />}
+                Cargar fila
               </button>
             </div>
 
@@ -317,7 +450,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
                 {patients.map((patient) => (
                   <button type="button" key={patient.row_number} onClick={() => selectPatient(patient)}>
                     <strong>{patient.nombrePaciente}</strong>
-                    <span>CI {patient.ciPaciente} · {patient.doctor || 'Sin médico'}</span>
+                    <span>Fila {patient.row_number} · CI {patient.ciPaciente} · {patient.doctor || 'Sin médico'}</span>
                   </button>
                 ))}
               </div>
