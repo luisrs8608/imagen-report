@@ -10,8 +10,10 @@ from app.api.patients import router as patients_router
 from app.api.reports import router as reports_router
 from app.core.config import get_settings
 from app.core.database import Base, SessionLocal, engine
+from app.core.report_models import REPORT_MODEL_OPTIONS
 from app.core.security import hash_password
 from app.models import User
+from app.schemas.config import PublicConfigResponse
 
 
 def bootstrap_admin() -> None:
@@ -80,9 +82,13 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/config", tags=["system"])
-def public_config() -> dict[str, bool]:
-    return {"gmail_draft_enabled": settings.gmail_draft_enabled}
+@app.get("/api/config", response_model=PublicConfigResponse, tags=["system"])
+def public_config() -> PublicConfigResponse:
+    return PublicConfigResponse(
+        gmail_draft_enabled=settings.gmail_draft_enabled,
+        report_default_model=settings.report_model,
+        report_models=list(REPORT_MODEL_OPTIONS),
+    )
 
 
 app.include_router(auth_router, prefix="/api")

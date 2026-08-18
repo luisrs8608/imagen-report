@@ -7,7 +7,8 @@ Aplicación web para generar informes radiológicos odontológicos a partir de u
 1. Un usuario interno inicia sesión con contraseña y un código enviado a su correo autorizado.
 2. Selecciona visualmente la pestaña o período de la Google Sheet y busca allí al paciente por nombre, cédula o médico. También puede cargar una fila exacta cuando existen registros repetidos. El enlace del estudio se completa desde la columna `L`.
 3. Dicta el informe mediante el reconocimiento de voz del navegador y puede corregir la transcripción.
-4. FastAPI envía únicamente el texto a Gemini para producir un borrador técnico.
+4. El usuario elige entre Gemini 3.5 Flash-Lite, Gemini 3.6 Flash y GPT-5.6 Luna; FastAPI envía
+   únicamente el texto al proveedor del modelo seleccionado para producir un borrador técnico.
 5. El profesional edita y aprueba expresamente el informe.
 6. El backend copia la plantilla de Google Docs, reemplaza los marcadores, exporta un PDF y guarda ambos archivos en Drive.
 7. Si la integración Gmail está habilitada, permite crear opcionalmente un borrador con el PDF adjunto. Nunca envía el correo automáticamente.
@@ -34,7 +35,7 @@ Se añadieron `recipientEmail`, `createGmailDraft` y `approved` para cubrir el c
 ## Estructura
 
 ```text
-backend/       FastAPI, autenticación, Gemini y APIs de Google
+backend/       FastAPI, autenticación, modelos de IA y APIs de Google
 frontend/      React, Vite, TypeScript y Tailwind
 deploy/        Proxy HTTPS
 docker-compose.yml
@@ -52,12 +53,13 @@ La guía completa, con valores, credenciales, comandos y verificaciones, está e
 ## Configuración externa
 
 1. Copiar `.env.example` como `.env` y completar todos los valores indicados en la guía local.
-2. Colocar la cuenta de servicio de lectura de Sheets fuera del repositorio, por ejemplo en `secrets/google-service-account.json`.
-3. Compartir la Google Sheet con esa cuenta exclusivamente como lector.
-4. Configurar las credenciales OAuth de una cuenta Google personal o Workspace para Docs y Drive.
-5. Confirmar que la plantilla y la carpeta de salida sean accesibles por esa cuenta.
-6. Si se desean borradores, habilitar Gmail en `.env` y autorizar también ese permiso.
-7. Configurar SMTP para los códigos de acceso.
+2. Configurar las API keys de Gemini y OpenAI para habilitar los tres modelos del selector.
+3. Colocar la cuenta de servicio de lectura de Sheets fuera del repositorio, por ejemplo en `secrets/google-service-account.json`.
+4. Compartir la Google Sheet con esa cuenta exclusivamente como lector.
+5. Configurar las credenciales OAuth de una cuenta Google personal o Workspace para Docs y Drive.
+6. Confirmar que la plantilla y la carpeta de salida sean accesibles por esa cuenta.
+7. Si se desean borradores, habilitar Gmail en `.env` y autorizar también ese permiso.
+8. Configurar SMTP para los códigos de acceso.
 
 En producción se debe establecer `APP_ENV=production` y `COOKIE_SECURE=true`. El backend se negará a iniciar si detecta los secretos o la contraseña inicial de desarrollo.
 

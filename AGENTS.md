@@ -3,8 +3,9 @@
 ## Propósito del proyecto
 
 Imagen Report es una aplicación web para crear informes radiológicos odontológicos. El flujo
-busca datos del paciente en una Google Sheet de solo lectura, captura un dictado, genera con Gemini
-un borrador técnico, exige revisión y aprobación profesional, crea un Google Doc desde una
+busca datos del paciente en una Google Sheet de solo lectura, captura un dictado y genera con un
+modelo de IA seleccionable un borrador técnico. Luego exige revisión y aprobación profesional,
+crea un Google Doc desde una
 plantilla, exporta un PDF a Drive y puede crear opcionalmente un borrador de Gmail con el PDF
 adjunto.
 
@@ -33,7 +34,9 @@ suite automatizada.
    configurados en el backend y la integración sigue siendo de solo lectura. También puede cargar
    el número de fila exacto de Google Sheets para distinguir estudios repetidos del mismo paciente.
 4. El navegador captura el dictado mediante reconocimiento de voz; el audio no se conserva.
-5. El backend envía el texto a Gemini y devuelve un borrador técnico.
+5. El usuario elige entre los modelos de Gemini y OpenAI habilitados; la elección se recuerda por
+   usuario en el navegador. El backend valida la selección, envía el texto al proveedor
+   correspondiente y devuelve un borrador técnico.
 6. El profesional edita el informe y debe aprobarlo expresamente.
 7. El backend copia una plantilla nativa de Google Docs, reemplaza marcadores, exporta el PDF y
    guarda ambos en la carpeta configurada de Drive.
@@ -121,7 +124,9 @@ SMTP para OTP y OAuth de Gmail para borradores son integraciones independientes.
 - `backend/app/api/patients.py`: búsqueda en la Sheet.
 - `backend/app/api/reports.py`: generación y publicación.
 - `backend/app/services/sheets.py`: lectura de Google Sheets.
-- `backend/app/services/gemini.py`: transformación del texto.
+- `backend/app/services/gemini.py`: transformación del texto con Gemini.
+- `backend/app/services/openai_report.py`: transformación del texto con OpenAI.
+- `backend/app/services/report_generator.py`: selección y enrutamiento del proveedor de IA.
 - `backend/app/services/google_publisher.py`: Docs, Drive, PDF y Gmail.
 - `backend/scripts/google_oauth_setup.py`: autorización local y obtención del refresh token.
 

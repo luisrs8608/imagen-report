@@ -1,8 +1,10 @@
 from functools import lru_cache
 
-from pydantic import EmailStr, Field, model_validator
+from pydantic import AliasChoices, EmailStr, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
+
+from app.core.report_models import ReportModel
 
 
 class Settings(BaseSettings):
@@ -11,6 +13,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         env_ignore_empty=True,
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_env: str = "development"
@@ -49,7 +52,11 @@ class Settings(BaseSettings):
     sheet_recipient_email_header: str = "ENVIO A..."
 
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.5-flash-lite"
+    openai_api_key: str | None = None
+    report_model: ReportModel = Field(
+        default="gemini-3.5-flash-lite",
+        validation_alias=AliasChoices("REPORT_MODEL", "GEMINI_MODEL"),
+    )
 
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: str | None = None

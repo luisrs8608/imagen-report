@@ -20,7 +20,16 @@ import {
 
 import { apiRequest } from '../lib/api';
 import type { SpeechRecognitionLike } from '../lib/speech';
-import type { AppConfig, Patient, PublishResult, ReportForm, SheetSelection, User } from '../lib/types';
+import type {
+  AppConfig,
+  Patient,
+  PublishResult,
+  ReportForm,
+  ReportModelId,
+  ReportModelOption,
+  SheetSelection,
+  User,
+} from '../lib/types';
 import { ReportDraftEditor } from './ReportDraftEditor';
 import { UserManagementPanel } from './UserManagementPanel';
 
@@ -63,6 +72,10 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
   const [error, setError] = useState('');
   const [result, setResult] = useState<PublishResult | null>(null);
   const [gmailDraftEnabled, setGmailDraftEnabled] = useState(false);
+  const [reportModels, setReportModels] = useState<ReportModelOption[]>([]);
+  const [selectedReportModel, setSelectedReportModel] = useState<ReportModelId>(
+    'gemini-3.5-flash-lite',
+  );
   const [showUserManagement, setShowUserManagement] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -71,9 +84,20 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
 
   useEffect(() => {
     apiRequest<AppConfig>('/config')
-      .then((config) => setGmailDraftEnabled(config.gmail_draft_enabled))
+      .then((config) => {
+        const storageKey = `imagen-report:report-model:${user.id}`;
+        const legacyStorageKey = `imagen-report:gemini-model:${user.id}`;
+        const rememberedModel = window.localStorage.getItem(storageKey)
+          ?? window.localStorage.getItem(legacyStorageKey);
+        const rememberedOption = config.report_models.find(
+          (option) => option.id === rememberedModel,
+        );
+        setGmailDraftEnabled(config.gmail_draft_enabled);
+        setReportModels(config.report_models);
+        setSelectedReportModel(rememberedOption?.id ?? config.report_default_model);
+      })
       .catch(() => setGmailDraftEnabled(false));
-  }, []);
+  }, [user.id]);
 
   useEffect(() => {
     apiRequest<SheetSelection>('/patients/sheets')
@@ -248,7 +272,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
     try {
       const response = await apiRequest<{ report: string }>('/reports/generate', {
         method: 'POST',
-        body: JSON.stringify({ transcript }),
+        body: JSON.stringify({ transcript, model: selectedReportModel }),
       });
       setGeneratedDraft(response.report);
       setForm((current) => ({ ...current, texto: response.report, approved: false }));
@@ -498,6 +522,29 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
             <div className="card-header">
               <div><Sparkles size={19} /><div><h2>Borrador técnico</h2><p>Generado por IA; requiere revisión profesional.</p></div></div>
             </div>
+            <label className="report-model-selector">
+              Modelo para generar el borrador
+              <select
+                value={selectedReportModel}
+                onChange={(event) => {
+                  const model = event.target.value as ReportModelId;
+                  setSelectedReportModel(model);
+                  window.localStorage.setItem(
+                    `imagen-report:report-model:${user.id}`,
+                    model,
+                  );
+                }}
+                disabled={reportModels.length === 0 || busyAction === 'generate'}
+              >
+                {reportModels.map((model) => (
+                  <option key={model.id} value={model.id}>{model.label}</option>
+                ))}
+              </select>
+              <small>
+                {reportModels.find((model) => model.id === selectedReportModel)?.description
+                  ?? 'Se utilizará en la próxima generación.'}
+              </small>
+            </label>
             <ReportDraftEditor
               value={form.texto}
               generatedDraft={generatedDraft}

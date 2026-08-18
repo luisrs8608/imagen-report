@@ -246,18 +246,39 @@ docker compose exec backend test -r /run/secrets/google-service-account.json
 
 El comando termina sin salida cuando el archivo existe y es legible.
 
-## 5. Configurar Gemini
+## 5. Configurar los modelos de IA
 
-1. Crear una API key en Google AI Studio dentro del proyecto que se utilizará.
-2. Pegarla en `GEMINI_API_KEY`.
-3. Mantener el modelo estable configurado:
+1. Crear una API key en [Google AI Studio](https://aistudio.google.com/app/apikey) dentro del
+   proyecto que se utilizará y copiarla en `GEMINI_API_KEY`.
+2. Entrar en [OpenAI Platform](https://platform.openai.com/), crear o seleccionar el proyecto que
+   utilizará Imagen Report y configurar allí la facturación o los créditos de la API.
+3. Abrir [API keys](https://platform.openai.com/api-keys), crear una clave secreta para el backend,
+   copiarla una sola vez y guardarla en `OPENAI_API_KEY`. No colocarla en el frontend ni subirla a
+   Git.
+4. Configurar en `REPORT_MODEL` el modelo que aparecerá seleccionado inicialmente:
 
 ```dotenv
 GEMINI_API_KEY=pegar-aqui-la-clave-real
-GEMINI_MODEL=gemini-3.5-flash-lite
+OPENAI_API_KEY=pegar-aqui-la-clave-real-de-openai
+REPORT_MODEL=gemini-3.5-flash-lite
 ```
 
-La clave solo es leída por FastAPI y nunca llega al navegador.
+La interfaz ofrece una lista cerrada con `gemini-3.5-flash-lite`, `gemini-3.6-flash` y
+`gpt-5.6-luna`. La elección se recuerda por usuario en el almacenamiento local del navegador y se
+envía al backend en cada generación. No se guarda en PostgreSQL ni modifica `REPORT_MODEL`; esa
+variable continúa siendo el valor predeterminado.
+
+Si una de las API keys queda vacía, los modelos del otro proveedor continúan funcionando. Al
+elegir un modelo cuyo proveedor no está configurado, la aplicación muestra un error explícito y no
+envía el texto a ningún servicio alternativo.
+
+`REPORT_MODEL` reemplaza a `GEMINI_MODEL` como nombre de configuración porque ahora existen dos
+proveedores. El backend mantiene compatibilidad con `GEMINI_MODEL` para instalaciones existentes,
+pero se recomienda migrar al nuevo nombre. Una suscripción de ChatGPT no sustituye el acceso de la
+API: la clave y la facturación se gestionan desde la plataforma de OpenAI.
+
+Las API keys solo son leídas por FastAPI y nunca llegan al navegador. El backend valida el modelo
+recibido contra la lista permitida y lo dirige al proveedor correspondiente.
 
 ## 6. Configurar Google Docs, Drive y el borrador opcional de Gmail
 

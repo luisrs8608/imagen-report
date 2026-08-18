@@ -10,8 +10,8 @@ from app.schemas.report import (
     PublishReportResponse,
 )
 from app.services.errors import IntegrationFailed, IntegrationNotConfigured
-from app.services.gemini import GeminiReportGenerator
 from app.services.google_publisher import GoogleReportPublisher
+from app.services.report_generator import ReportGenerator
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -23,7 +23,10 @@ def generate_report(
     settings: Settings = Depends(get_settings),
 ) -> GenerateReportResponse:
     try:
-        report = GeminiReportGenerator(settings).generate(payload.transcript)
+        report = ReportGenerator(settings).generate(
+            payload.transcript,
+            model=payload.model,
+        )
     except IntegrationNotConfigured as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

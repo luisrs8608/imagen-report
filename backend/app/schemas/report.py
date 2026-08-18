@@ -2,9 +2,12 @@ from datetime import date
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from app.core.report_models import ReportModel
+
 
 class GenerateReportRequest(BaseModel):
     transcript: str = Field(min_length=1, max_length=30_000)
+    model: ReportModel | None = None
 
 
 class GenerateReportResponse(BaseModel):

@@ -10,8 +10,22 @@ export interface AdminUser extends User {
   created_at: string;
 }
 
+export type ReportModelId =
+  | 'gemini-3.5-flash-lite'
+  | 'gemini-3.6-flash'
+  | 'gpt-5.6-luna';
+
+export interface ReportModelOption {
+  id: ReportModelId;
+  provider: 'google' | 'openai';
+  label: string;
+  description: string;
+}
+
 export interface AppConfig {
   gmail_draft_enabled: boolean;
+  report_default_model: ReportModelId;
+  report_models: ReportModelOption[];
 }
 
 export interface LoginChallenge {
