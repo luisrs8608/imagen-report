@@ -3,20 +3,15 @@ import {
   Check,
   Clipboard,
   Expand,
-  Loader2,
   Minimize2,
   RotateCcw,
-  Sparkles,
 } from 'lucide-react';
 
 interface ReportDraftEditorProps {
   value: string;
   generatedDraft: string;
   approved: boolean;
-  canGenerate: boolean;
-  isGenerating: boolean;
   onChange: (value: string) => void;
-  onGenerate: () => void;
 }
 
 type CopyState = 'idle' | 'copied' | 'error';
@@ -25,13 +20,11 @@ export function ReportDraftEditor({
   value,
   generatedDraft,
   approved,
-  canGenerate,
-  isGenerating,
   onChange,
-  onGenerate,
 }: ReportDraftEditorProps) {
   const textareaId = useId();
   const helpId = useId();
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
@@ -55,17 +48,39 @@ export function ReportDraftEditor({
     if (!expanded) return undefined;
 
     const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     document.body.style.overflow = 'hidden';
     window.requestAnimationFrame(() => textareaRef.current?.focus());
 
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setExpanded(false);
+    function handleDialogKeyboard(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setExpanded(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !editorRef.current) return;
+
+      const focusable = Array.from(editorRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
-    window.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', handleDialogKeyboard);
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('keydown', handleDialogKeyboard);
+      previouslyFocused?.focus();
     };
   }, [expanded]);
 
@@ -93,7 +108,13 @@ export function ReportDraftEditor({
   }
 
   return (
-    <div className={`draft-editor${expanded ? ' is-expanded' : ''}`}>
+    <div
+      ref={editorRef}
+      className={`draft-editor${expanded ? ' is-expanded' : ''}`}
+      role={expanded ? 'dialog' : undefined}
+      aria-modal={expanded ? 'true' : undefined}
+      aria-label={expanded ? 'Editor ampliado del informe' : undefined}
+    >
       <div className="draft-editor-toolbar">
         <div className="draft-editor-status">
           <span className={`draft-status-dot ${reviewState.className}`} aria-hidden="true" />
@@ -103,7 +124,7 @@ export function ReportDraftEditor({
           </div>
         </div>
 
-        <div className="draft-editor-tools" aria-label="Herramientas del editor">
+        <div className="draft-editor-tools" aria-label="Herramientas del editor" aria-live="polite">
           <button
             type="button"
             className="draft-tool-button"
@@ -142,11 +163,13 @@ export function ReportDraftEditor({
       <textarea
         ref={textareaRef}
         id={textareaId}
+        name="texto"
         className="draft-editor-textarea"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Genere el borrador y edítelo aquí..."
+        placeholder="Genere el borrador y edítelo aquí…"
         aria-describedby={helpId}
+        autoComplete="off"
         lang="es"
         spellCheck
         autoCapitalize="sentences"
@@ -154,20 +177,8 @@ export function ReportDraftEditor({
       />
 
       <div className="draft-editor-footer" id={helpId}>
-        <span>{wordCount} palabras · {characterCount} caracteres · {lineCount} líneas</span>
+        <span className="editor-counts">{wordCount} palabras · {characterCount} caracteres · {lineCount} líneas</span>
         <span>{approved ? 'La aprobación está vigente.' : 'Cualquier edición requiere una nueva aprobación.'}</span>
-      </div>
-
-      <div className="draft-editor-actions">
-        <button
-          type="button"
-          className="ai-button"
-          onClick={onGenerate}
-          disabled={!canGenerate || isGenerating}
-        >
-          {isGenerating ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-          {isGenerating ? 'Generando…' : hasGeneratedVersion ? 'Regenerar borrador' : 'Generar borrador'}
-        </button>
       </div>
     </div>
   );

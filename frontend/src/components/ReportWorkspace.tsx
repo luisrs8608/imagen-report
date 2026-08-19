@@ -31,6 +31,7 @@ import type {
   User,
 } from '../lib/types';
 import { ReportDraftEditor } from './ReportDraftEditor';
+import { ThemeToggle, type ColorTheme } from './ThemeToggle';
 import { UserManagementPanel } from './UserManagementPanel';
 
 function createInitialForm(): ReportForm {
@@ -52,14 +53,17 @@ function createInitialForm(): ReportForm {
 
 interface ReportWorkspaceProps {
   user: User;
+  theme: ColorTheme;
+  onToggleTheme: () => void;
   onLogout: () => void;
 }
 
-export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
+export function ReportWorkspace({ user, theme, onToggleTheme, onLogout }: ReportWorkspaceProps) {
   const [form, setForm] = useState<ReportForm>(createInitialForm);
   const [query, setQuery] = useState('');
   const [rowNumber, setRowNumber] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [searchAttempted, setSearchAttempted] = useState(false);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState('');
   const [loadingSheets, setLoadingSheets] = useState(true);
@@ -171,6 +175,23 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const hasUnsavedWork = !result && Boolean(
+      form.nombrePaciente
+      || form.ciPaciente
+      || form.doctor
+      || form.texto
+      || transcript,
+    );
+    if (!hasUnsavedWork) return undefined;
+
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [form.ciPaciente, form.doctor, form.nombrePaciente, form.texto, result, transcript]);
+
   function updateField<K extends keyof ReportForm>(field: K, value: ReportForm[K]) {
     setForm((current) => ({
       ...current,
@@ -183,6 +204,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
   async function searchPatients() {
     if (query.trim().length < 2) return;
     setBusyAction('search');
+    setSearchAttempted(true);
     setError('');
     try {
       const sheetParameter = selectedSheet
@@ -234,6 +256,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
       driveUrl: patient.driveUrl || '',
     }));
     setPatients([]);
+    setSearchAttempted(false);
     setQuery('');
     setRowNumber('');
   }
@@ -319,39 +342,61 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
     setQuery('');
     setRowNumber('');
     setPatients([]);
+    setSearchAttempted(false);
     setTranscript('');
     setGeneratedDraft('');
     setInterimTranscript('');
     setBusyAction(null);
     setError('');
     setResult(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
     window.requestAnimationFrame(() => patientSearchRef.current?.focus());
+  }
+
+  const currentStep = result
+    ? 5
+    : form.approved
+      ? 4
+      : form.texto
+        ? 3
+        : form.nombrePaciente
+          ? 2
+          : 1;
+
+  function stepState(step: number) {
+    if (step < currentStep) return 'done';
+    if (step === currentStep) return 'active';
+    return '';
   }
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Saltar al contenido principal</a>
       <header className="topbar">
-        <div className="brand-row">
-          <div className="brand-mark small"><Stethoscope size={19} /></div>
-          <div>
-            <strong>Imagen Report</strong>
-            <span>Informes radiológicos</span>
+        <div className="topbar-inner">
+          <div className="brand-row">
+            <div className="brand-mark small"><Stethoscope size={19} aria-hidden="true" /></div>
+            <div>
+              <strong>Imagen Report</strong>
+              <span>Informes radiológicos</span>
+            </div>
           </div>
-        </div>
-        <div className="user-menu">
-          {user.is_admin && (
-            <button type="button" className="admin-nav-button" onClick={() => setShowUserManagement(true)}>
-              <UsersRound size={17} /> Usuarios
+          <div className="user-menu">
+            {user.is_admin && (
+              <button type="button" className="admin-nav-button" onClick={() => setShowUserManagement(true)}>
+                <UsersRound size={17} aria-hidden="true" /> Usuarios
+              </button>
+            )}
+            <div>
+              <strong>{user.username}</strong>
+              <span className="breakable">{user.email}</span>
+            </div>
+            <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+            <button type="button" className="icon-button" onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión">
+              <LogOut size={18} aria-hidden="true" />
             </button>
-          )}
-          <div>
-            <strong>{user.username}</strong>
-            <span>{user.email}</span>
           </div>
-          <button type="button" className="icon-button" onClick={logout} title="Cerrar sesión">
-            <LogOut size={18} />
-          </button>
         </div>
       </header>
 
@@ -363,7 +408,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
         />
       )}
 
-      <main className="workspace">
+      <main className="workspace" id="main-content">
         <section className="page-heading">
           <div>
             <p className="eyebrow">Nuevo informe</p>
@@ -371,10 +416,10 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
             <p className="muted">Complete el flujo y apruebe el texto antes de crear el PDF.</p>
           </div>
           <ol className="steps" aria-label="Etapas del informe">
-            <li className={form.nombrePaciente ? 'done' : 'active'}><span>1</span> Paciente</li>
-            <li className={transcript ? 'done' : ''}><span>2</span> Dictado</li>
-            <li className={form.approved ? 'done' : ''}><span>3</span> Revisión</li>
-            <li className={result ? 'done' : ''}><span>4</span> Documento</li>
+            <li className={stepState(1)} aria-current={currentStep === 1 ? 'step' : undefined}><span>1</span><strong>Paciente</strong></li>
+            <li className={stepState(2)} aria-current={currentStep === 2 ? 'step' : undefined}><span>2</span><strong>Dictado</strong></li>
+            <li className={stepState(3)} aria-current={currentStep === 3 ? 'step' : undefined}><span>3</span><strong>Revisión</strong></li>
+            <li className={stepState(4)} aria-current={currentStep === 4 ? 'step' : undefined}><span>4</span><strong>Documento</strong></li>
           </ol>
         </section>
 
@@ -390,6 +435,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
               <label className="sheet-selector">
                 Hoja de trabajo
                 <select
+                  name="sheet"
                   value={selectedSheet}
                   onChange={(event) => {
                     const sheetName = event.target.value;
@@ -399,6 +445,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
                       sheetName,
                     );
                     setPatients([]);
+                    setSearchAttempted(false);
                   }}
                   disabled={loadingSheets || sheetNames.length === 0}
                 >
@@ -418,6 +465,8 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
                   <Search size={17} />
                   <input
                     ref={patientSearchRef}
+                    name="patient_search"
+                    autoComplete="off"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     onKeyDown={(event) => {
@@ -426,7 +475,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
                       if (busyAction === 'search' || query.trim().length < 2) return;
                       void searchPatients();
                     }}
-                    placeholder="Escriba al menos dos caracteres"
+                    placeholder="Ej.: apellido, cédula o médico…"
                   />
                 </div>
               </label>
@@ -445,13 +494,15 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
                 <div className="input-with-icon">
                   <Hash size={17} />
                   <input
+                    name="sheet_row"
                     type="number"
                     min="1"
                     step="1"
                     inputMode="numeric"
+                    autoComplete="off"
                     value={rowNumber}
                     onChange={(event) => setRowNumber(event.target.value)}
-                    placeholder="Ej. 42"
+                    placeholder="Ej.: 42…"
                   />
                 </div>
               </label>
@@ -471,7 +522,7 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
             </div>
 
             {patients.length > 0 && (
-              <div className="patient-results">
+              <div className="patient-results" aria-live="polite" aria-label="Resultados de pacientes">
                 {patients.map((patient) => (
                   <button type="button" key={patient.row_number} onClick={() => selectPatient(patient)}>
                     <strong>{patient.nombrePaciente}</strong>
@@ -481,24 +532,30 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
               </div>
             )}
 
+            {searchAttempted && busyAction !== 'search' && patients.length === 0 && (
+              <div className="empty-state" role="status">
+                No se encontraron coincidencias en la hoja seleccionada. Revise el término o cargue una fila exacta.
+              </div>
+            )}
+
             <label>
               <span className="label-with-icon"><ClipboardPaste size={15} /> Datos pegados desde la planilla</span>
-              <input value={form.recordData} onChange={(event) => parseRecordData(event.target.value)} placeholder="Nombre[TAB]Doctor[TAB]Cédula" />
+              <input name="recordData" autoComplete="off" value={form.recordData} onChange={(event) => parseRecordData(event.target.value)} placeholder="Nombre[TAB]Doctor[TAB]Cédula…" />
             </label>
 
             <div className="field-grid three">
-              <label>Nombre del paciente<input value={form.nombrePaciente} onChange={(event) => updateField('nombrePaciente', event.target.value)} required /></label>
-              <label>Cédula de identidad<input value={form.ciPaciente} onChange={(event) => updateField('ciPaciente', event.target.value)} required /></label>
-              <label>Fecha<input type="date" value={form.fecha} onChange={(event) => updateField('fecha', event.target.value)} required /></label>
+              <label>Nombre del paciente<input name="nombrePaciente" autoComplete="off" value={form.nombrePaciente} onChange={(event) => updateField('nombrePaciente', event.target.value)} required /></label>
+              <label>Cédula de identidad<input name="ciPaciente" autoComplete="off" inputMode="numeric" value={form.ciPaciente} onChange={(event) => updateField('ciPaciente', event.target.value)} required /></label>
+              <label>Fecha<input name="fecha" type="date" autoComplete="off" value={form.fecha} onChange={(event) => updateField('fecha', event.target.value)} required /></label>
               <label>
                 Tratamiento
-                <select value={form.doctor_gender} onChange={(event) => updateField('doctor_gender', event.target.value as 'Dr.' | 'Dra.')}>
+                <select name="doctor_gender" value={form.doctor_gender} onChange={(event) => updateField('doctor_gender', event.target.value as 'Dr.' | 'Dra.')}>
                   <option value="Dr.">Dr.</option><option value="Dra.">Dra.</option>
                 </select>
               </label>
-              <label className="span-two-fields">Médico solicitante<input value={form.doctor} onChange={(event) => updateField('doctor', event.target.value)} required /></label>
-              <label>Medidas (mm)<input value={form.measures} onChange={(event) => updateField('measures', event.target.value)} required /></label>
-              <label className="span-two-fields">Enlace Google Drive<input type="url" value={form.driveUrl} onChange={(event) => updateField('driveUrl', event.target.value)} placeholder="https://drive.google.com/..." required /></label>
+              <label className="span-two-fields">Médico solicitante<input name="doctor" autoComplete="off" value={form.doctor} onChange={(event) => updateField('doctor', event.target.value)} required /></label>
+              <label>Medidas (mm)<input name="measures" autoComplete="off" inputMode="decimal" value={form.measures} onChange={(event) => updateField('measures', event.target.value)} required /></label>
+              <label className="span-two-fields">Enlace Google Drive<input name="driveUrl" type="url" autoComplete="off" value={form.driveUrl} onChange={(event) => updateField('driveUrl', event.target.value)} placeholder="https://drive.google.com/…" required /></label>
             </div>
           </section>
 
@@ -507,8 +564,9 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
               <div><Mic size={19} /><div><h2>Dictado original</h2><p>La transcripción puede corregirse antes de utilizar IA.</p></div></div>
               <span className={`status-pill ${recording ? 'recording' : ''}`}>{recording ? 'En vivo' : 'Listo'}</span>
             </div>
-            <textarea className="editor transcript" value={transcript} onChange={(event) => setTranscript(event.target.value)} placeholder="El dictado aparecerá aquí..." />
-            {interimTranscript && <p className="interim-text">{interimTranscript}</p>}
+            <label className="sr-only" htmlFor="report-transcript">Texto del dictado original</label>
+            <textarea id="report-transcript" name="transcript" autoComplete="off" className="editor transcript" value={transcript} onChange={(event) => setTranscript(event.target.value)} placeholder="El dictado aparecerá aquí…" />
+            {interimTranscript && <p className="interim-text" aria-live="polite">{interimTranscript}</p>}
             {!speechSupported && <div className="notice warning">El navegador no ofrece reconocimiento de voz. Puede escribir o pegar la transcripción.</div>}
             <div className="button-row">
               <button type="button" className={recording ? 'danger-button' : 'primary-button'} onClick={toggleRecording} disabled={!speechSupported}>
@@ -522,40 +580,54 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
             <div className="card-header">
               <div><Sparkles size={19} /><div><h2>Borrador técnico</h2><p>Generado por IA; requiere revisión profesional.</p></div></div>
             </div>
-            <label className="report-model-selector">
-              Modelo para generar el borrador
-              <select
-                value={selectedReportModel}
-                onChange={(event) => {
-                  const model = event.target.value as ReportModelId;
-                  setSelectedReportModel(model);
-                  window.localStorage.setItem(
-                    `imagen-report:report-model:${user.id}`,
-                    model,
-                  );
-                }}
-                disabled={reportModels.length === 0 || busyAction === 'generate'}
-              >
-                {reportModels.map((model) => (
-                  <option key={model.id} value={model.id}>{model.label}</option>
-                ))}
-              </select>
+            <div className="model-generation-panel">
+              <label htmlFor="report-model">Modelo para generar el borrador</label>
+              <div className="model-generation-controls">
+                <select
+                  id="report-model"
+                  name="report_model"
+                  value={selectedReportModel}
+                  onChange={(event) => {
+                    const model = event.target.value as ReportModelId;
+                    setSelectedReportModel(model);
+                    window.localStorage.setItem(
+                      `imagen-report:report-model:${user.id}`,
+                      model,
+                    );
+                  }}
+                  disabled={reportModels.length === 0 || busyAction === 'generate'}
+                >
+                  {reportModels.map((model) => (
+                    <option key={model.id} value={model.id}>{model.label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="ai-button model-generate-button"
+                  onClick={generateDraft}
+                  disabled={!transcript.trim() || busyAction === 'generate'}
+                >
+                  {busyAction === 'generate' ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                  {busyAction === 'generate'
+                    ? 'Generando…'
+                    : generatedDraft.trim()
+                      ? 'Regenerar borrador'
+                      : 'Generar borrador'}
+                </button>
+              </div>
               <small>
                 {reportModels.find((model) => model.id === selectedReportModel)?.description
                   ?? 'Se utilizará en la próxima generación.'}
               </small>
-            </label>
+            </div>
             <ReportDraftEditor
               value={form.texto}
               generatedDraft={generatedDraft}
               approved={form.approved}
-              canGenerate={Boolean(transcript.trim())}
-              isGenerating={busyAction === 'generate'}
               onChange={(value) => updateField('texto', value)}
-              onGenerate={generateDraft}
             />
             <label className="approval-box">
-              <input type="checkbox" checked={form.approved} onChange={(event) => updateField('approved', event.target.checked)} disabled={!form.texto.trim()} />
+              <input name="approved" type="checkbox" checked={form.approved} onChange={(event) => updateField('approved', event.target.checked)} disabled={!form.texto.trim()} />
               <span><strong>Informe revisado y aprobado</strong><small>Confirmo que el texto fue verificado por un profesional.</small></span>
             </label>
           </section>
@@ -567,12 +639,12 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
             {gmailDraftEnabled ? (
               <>
                 <label className="gmail-option">
-                  <input type="checkbox" checked={form.createGmailDraft} onChange={(event) => updateField('createGmailDraft', event.target.checked)} />
+                  <input name="createGmailDraft" type="checkbox" checked={form.createGmailDraft} onChange={(event) => updateField('createGmailDraft', event.target.checked)} />
                   <Mail size={18} />
                   <span><strong>Crear borrador en Gmail</strong><small>Opcional para este informe. El correo no se enviará automáticamente.</small></span>
                 </label>
                 {form.createGmailDraft && (
-                  <label className="recipient-field">Correo del destinatario<input type="email" value={form.recipientEmail} onChange={(event) => updateField('recipientEmail', event.target.value)} placeholder="medico@gmail.com" required /></label>
+                  <label className="recipient-field">Correo del destinatario<input name="recipientEmail" type="email" autoComplete="email" spellCheck={false} value={form.recipientEmail} onChange={(event) => updateField('recipientEmail', event.target.value)} placeholder="Ej.: medico@gmail.com…" required /></label>
                 )}
               </>
             ) : (
@@ -584,11 +656,13 @@ export function ReportWorkspace({ user, onLogout }: ReportWorkspaceProps) {
 
             <button type="submit" className="publish-button" disabled={!form.approved || busyAction === 'publish'}>
               {busyAction === 'publish' ? <Loader2 className="spin" size={19} /> : <FileText size={19} />}
-              Crear Google Doc y PDF{form.createGmailDraft ? ' + borrador de correo' : ''}
+              {busyAction === 'publish'
+                ? 'Creando archivos…'
+                : `Crear Google Doc y PDF${form.createGmailDraft ? ' + borrador de correo' : ''}`}
             </button>
 
             {result && (
-              <div className="result-card">
+              <div className="result-card" role="status" aria-live="polite">
                 <CheckCircle2 size={24} />
                 <div><strong>Informe generado correctamente</strong><p>Los archivos quedaron guardados en Google Drive.</p></div>
                 <div className="result-links">

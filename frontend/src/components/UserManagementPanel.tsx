@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
   KeyRound,
@@ -48,13 +48,43 @@ export function UserManagementPanel({
   const [busyKey, setBusyKey] = useState<string | null>('load');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+    const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    document.body.style.overflow = 'hidden';
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const handleDialogKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !overlayRef.current) return;
+
+      const focusable = Array.from(overlayRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', handleDialogKeyboard);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleDialogKeyboard);
+      previouslyFocused?.focus();
+    };
   }, [onClose]);
 
   useEffect(() => {
@@ -171,7 +201,7 @@ export function UserManagementPanel({
   }
 
   return (
-    <div className="admin-overlay" role="dialog" aria-modal="true" aria-labelledby="user-management-title">
+    <div ref={overlayRef} className="admin-overlay" role="dialog" aria-modal="true" aria-labelledby="user-management-title">
       <section className="admin-panel">
         <header className="admin-panel-header">
           <div>
@@ -182,14 +212,14 @@ export function UserManagementPanel({
               <p>Solo las cuentas creadas aquí pueden acceder a la aplicación.</p>
             </div>
           </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Cerrar gestión de usuarios">
+          <button ref={closeButtonRef} type="button" className="icon-button" onClick={onClose} aria-label="Cerrar gestión de usuarios">
             <X size={19} />
           </button>
         </header>
 
         <div className="admin-panel-body">
           {error && <div className="notice error" role="alert">{error}</div>}
-          {success && <div className="notice success"><CheckCircle2 size={18} />{success}</div>}
+          {success && <div className="notice success" role="status" aria-live="polite"><CheckCircle2 size={18} />{success}</div>}
 
           <div className="admin-layout">
             <form className="user-create-card" onSubmit={createUser}>
@@ -200,39 +230,47 @@ export function UserManagementPanel({
               <label>
                 Usuario
                 <input
+                  name="username"
+                  autoComplete="off"
+                  spellCheck={false}
                   value={createForm.username}
                   onChange={(event) => setCreateForm((current) => ({ ...current, username: event.target.value.toLowerCase() }))}
                   minLength={3}
                   maxLength={80}
                   pattern="[a-zA-Z0-9_.-]+"
-                  placeholder="doctor.apellido"
+                  placeholder="Ej.: doctor.apellido…"
                   required
                 />
               </label>
               <label>
                 Correo para el OTP
                 <input
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  spellCheck={false}
                   value={createForm.email}
                   onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))}
-                  placeholder="doctor@gmail.com"
+                  placeholder="Ej.: doctor@gmail.com…"
                   required
                 />
               </label>
               <label>
                 Contraseña inicial
                 <input
+                  name="password"
                   type="password"
                   value={createForm.password}
                   onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))}
                   minLength={12}
                   autoComplete="new-password"
-                  placeholder="Mínimo 12 caracteres"
+                  placeholder="Mínimo 12 caracteres…"
                   required
                 />
               </label>
               <label className="admin-check">
                 <input
+                  name="is_admin"
                   type="checkbox"
                   checked={createForm.is_admin}
                   onChange={(event) => setCreateForm((current) => ({ ...current, is_admin: event.target.checked }))}
@@ -274,8 +312,11 @@ export function UserManagementPanel({
 
                         <div className="admin-email-editor">
                           <input
+                            name={`email-${user.id}`}
                             type="email"
                             aria-label={`Correo de ${user.username}`}
+                            autoComplete="off"
+                            spellCheck={false}
                             value={emailDrafts[user.id] || ''}
                             onChange={(event) => setEmailDrafts((current) => ({ ...current, [user.id]: event.target.value }))}
                           />
@@ -301,7 +342,7 @@ export function UserManagementPanel({
                           <form className="password-reset-row" onSubmit={(event) => resetUserPassword(event, user)}>
                             <label>
                               Nueva contraseña para {user.username}
-                              <input type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} minLength={12} autoComplete="new-password" required autoFocus />
+                              <input name={`password-${user.id}`} type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} minLength={12} autoComplete="new-password" placeholder="Mínimo 12 caracteres…" required />
                             </label>
                             <div>
                               <button type="button" className="text-button" onClick={() => { setResetUserId(null); setResetPassword(''); }}>Cancelar</button>
